@@ -12,7 +12,9 @@ out = "out"
 libs = ["lib", "node_modules"]
 cache_path  = "cache"
 
-block_gas_limit = 30_000_000
+gas_limit = "18446744073709551615"
+block_gas_limit = 300_000_000
+memory_limit = 330554432
 fuzz = { runs = 256 }
 
 gas_reports = [

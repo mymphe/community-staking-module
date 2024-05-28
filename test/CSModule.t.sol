@@ -2679,6 +2679,24 @@ contract CsmQueueOps is CSMCommon {
     }
 }
 
+contract CSMDummy is CSMCommon {
+    function test_getSigningKeys_100keys() public {
+        uint256 n = 1000;
+        bytes memory ids = "";
+        bytes memory values = "";
+        for (uint256 i = 0; i < n; i++) {
+            createNodeOperator(1);
+            csm.updateTargetValidatorsLimits(i, 1, 1);
+            ids = bytes.concat(ids, bytes8(uint64(i)));
+            values = bytes.concat(values, bytes16(uint128(1)));
+        }
+        csm.obtainDepositData(n, "");
+
+        csm.updateStuckValidatorsCount(ids, values);
+        csm.updateExitedValidatorsCount(ids, values);
+    }
+}
+
 contract CsmUnvetKeys is CSMCommon {
     function test_unvetKeys_counters() public {
         uint256 noId = createNodeOperator(3);
