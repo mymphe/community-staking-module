@@ -13,6 +13,33 @@ library SSZ {
 
     function hashTreeRoot(
         BeaconBlockHeader memory header
+    ) internal pure returns (bytes32) {
+        bytes32[8] memory nodes = [
+            toLittleEndian(header.slot),
+            toLittleEndian(header.proposerIndex),
+            header.parentRoot,
+            header.stateRoot,
+            header.bodyRoot,
+            bytes32(0),
+            bytes32(0),
+            bytes32(0)
+        ];
+
+        unchecked {
+            for (uint256 count = nodes.length; count > 1; count /= 2) {
+                for (uint256 source; source < count; source += 2) {
+                    nodes[source / 2] = sha256(
+                        abi.encode(nodes[source], nodes[source + 1])
+                    );
+                }
+            }
+        }
+
+        return nodes[0];
+    }
+
+    function hashTreeRootYul(
+        BeaconBlockHeader memory header
     ) internal view returns (bytes32 root) {
         bytes32[8] memory nodes = [
             toLittleEndian(header.slot),
@@ -82,6 +109,33 @@ library SSZ {
     }
 
     function hashTreeRoot(
+        Validator memory validator
+    ) internal view returns (bytes32) {
+        bytes32[8] memory nodes = [
+            sha256(bytes.concat(validator.pubkey, bytes16(0))),
+            validator.withdrawalCredentials,
+            toLittleEndian(validator.effectiveBalance),
+            toLittleEndian(validator.slashed),
+            toLittleEndian(validator.activationEligibilityEpoch),
+            toLittleEndian(validator.activationEpoch),
+            toLittleEndian(validator.exitEpoch),
+            toLittleEndian(validator.withdrawableEpoch)
+        ];
+
+        unchecked {
+            for (uint256 count = nodes.length; count > 1; count /= 2) {
+                for (uint256 source; source < count; source += 2) {
+                    nodes[source / 2] = sha256(
+                        abi.encode(nodes[source], nodes[source + 1])
+                    );
+                }
+            }
+        }
+
+        return nodes[0];
+    }
+
+    function hashTreeRootYul(
         Validator memory validator
     ) internal view returns (bytes32 root) {
         bytes32 pubkeyRoot;
@@ -177,6 +231,42 @@ library SSZ {
     /// @notice Modified version of `verify` from Solady `MerkleProofLib` to support generalized indices and sha256 precompile.
     /// @dev Reverts if `leaf` doesn't exist in the Merkle tree with `root`, given `proof`.
     function verifyProof(
+        bytes32[] calldata proof,
+        bytes32 root,
+        bytes32 leaf,
+        GIndex gI
+    ) internal view {
+        uint256 index = gI.index();
+
+        if (proof.length == 0) {
+            revert InvalidProof();
+        }
+
+        for (uint256 i; i < proof.length; ++i) {
+            if (index & 1 == 1) {
+                leaf = sha256(abi.encode(proof[i], leaf));
+            } else {
+                leaf = sha256(abi.encode(leaf, proof[i]));
+            }
+
+            index = index >> 1;
+            if (index == 0) {
+                revert BranchHasExtraItem();
+            }
+        }
+
+        if (index != 1) {
+            revert BranchHasMissingItem();
+        }
+
+        if (leaf != root) {
+            revert InvalidProof();
+        }
+    }
+
+    /// @notice Modified version of `verify` from Solady `MerkleProofLib` to support generalized indices and sha256 precompile.
+    /// @dev Reverts if `leaf` doesn't exist in the Merkle tree with `root`, given `proof`.
+    function verifyProofYul(
         bytes32[] calldata proof,
         bytes32 root,
         bytes32 leaf,
